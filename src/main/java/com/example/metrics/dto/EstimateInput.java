@@ -1,5 +1,14 @@
 package com.example.metrics.dto;
+/**
+ * 工作量/成本估算参数DTO
 
+ * 软件经济学中的核心概念：
+ * - 工作量估算：需要多少人月完成项目
+ * - 成本估算：需要多少资金
+ * - 时间估算：需要多少日历时间
+
+ * COCOMO模型等成本估算方法都需要这些参数
+ */
 public class EstimateInput {
     private int teamMembers = 3;
     private int monthlyRate = 15000;

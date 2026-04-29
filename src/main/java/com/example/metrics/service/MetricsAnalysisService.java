@@ -16,7 +16,23 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+/**
+ * 软件度量分析服务（核心业务逻辑层）
 
+ * 这是整个工具的"大脑"，负责：
+ * 1. 调用AST解析器分析代码
+ * 2. 汇总多个文件的度量结果
+ * 3. 应用各种度量模型（CK、LK、圈复杂度等）
+ * 4. 计算工作量、成本、时间估算
+ * 5. 生成风险分析报告
+
+ * 软件度量知识点覆盖：
+ * - 规模度量：LoC（代码行数）
+ * - 面向对象度量：CK指标集、LK指标集
+ * - 复杂度度量：圈复杂度
+ * - 工作量估算：基于KLoC的COCOMO风格模型
+ * - 成本估算：工作量 × 人力成本
+ */
 @Service
 public class MetricsAnalysisService {
 
@@ -25,6 +41,8 @@ public class MetricsAnalysisService {
         DesignInput design = request == null || request.getDesign() == null ? new DesignInput() : request.getDesign();
         EstimateInput estimate = request == null || request.getEstimate() == null ? new EstimateInput() : request.getEstimate();
 
+        // 文本模式也包装成 SourceUnit，
+        // 这样后面就能和文件上传模式共用同一套分析与汇总流程。
         List<SourceUnit> sources = new ArrayList<>();
         sources.add(new SourceUnit("InlineSnippet.java", code));
         return analyzeSources(sources, design, estimate, "text");
@@ -34,13 +52,17 @@ public class MetricsAnalysisService {
         List<SourceUnit> sources = new ArrayList<>();
         if (files != null) {
             for (MultipartFile file : files) {
+                // 空文件直接跳过，避免后面解析时报错。
                 if (file == null || file.isEmpty()) {
                     continue;
                 }
                 String filename = file.getOriginalFilename() == null ? "UploadedFile.java" : file.getOriginalFilename();
+                // 当前版本只分析 Java 文件。
                 if (!filename.toLowerCase().endsWith(".java")) {
                     continue;
                 }
+                // 上传文件先读成普通字符串，再包装成 SourceUnit。
+                // 这样后续逻辑就不用区分“来自文本框”还是“来自文件上传”。
                 String content = new String(file.getBytes(), StandardCharsets.UTF_8);
                 sources.add(new SourceUnit(filename, content));
             }
@@ -50,19 +72,26 @@ public class MetricsAnalysisService {
     }
 
     private Map<String, Object> analyzeSources(List<SourceUnit> sources, DesignInput design, EstimateInput estimate, String analysisMode) {
+        // AggregateSummary 用来做“项目级总汇总”。
+        // 单文件分析时它也会用，只不过只累加一次。
         AggregateSummary aggregate = new AggregateSummary();
         List<String> analyzedFiles = new ArrayList<>();
 
         for (SourceUnit source : sources) {
+            // 空白源码没有分析意义，直接忽略。
             if (source.content() == null || source.content().isBlank()) {
                 continue;
             }
             analyzedFiles.add(source.name());
+            // 每个源码单元先独立分析，再合并成项目级汇总结果。
             MetricsVisitor.AnalysisSummary summary = parseSource(source.content()).buildSummary();
             aggregate.accumulate(summary, source.name());
         }
 
         int loc = aggregate.loc;
+        // 下面这部分是简化版项目估算逻辑：
+        // 先根据代码规模、设计规模和复杂度估算工作量，
+        // 再进一步推导开发周期、成本和建议人力。
         double adjustedKloc = Math.max(loc / 1000.0, 0.1);
         double useCaseWeight = design.getActors() * 1.5 + design.getUseCases() * 2.0 + design.getTransactions() * 0.8;
         double designWeight = design.getClasses() * 0.5 + design.getEntities() * 0.4 + design.getDecisions() * 0.7;
@@ -74,6 +103,7 @@ public class MetricsAnalysisService {
         int configuredPeople = Math.max(estimate.getTeamMembers(), 1);
         int cost = (int) Math.round(effort * estimate.getMonthlyRate());
 
+        // overview：给前端顶部总览区和统计卡片使用。
         Map<String, Object> overview = new LinkedHashMap<>();
         overview.put("loc", loc);
         overview.put("commentLines", aggregate.commentLines);
@@ -90,6 +120,7 @@ public class MetricsAnalysisService {
         overview.put("sourceFiles", analyzedFiles.size());
         overview.put("analysisMode", analysisMode);
 
+        // ckMetrics：CK 面向对象模型相关指标。
         Map<String, Object> ckMetrics = new LinkedHashMap<>();
         ckMetrics.put("WMC", aggregate.wmc);
         ckMetrics.put("DIT", aggregate.dit);
@@ -98,6 +129,7 @@ public class MetricsAnalysisService {
         ckMetrics.put("LCOM", aggregate.lcom);
         ckMetrics.put("NOC", Math.max(aggregate.noc, design.getSubclasses()));
 
+        // lkMetrics：类的属性、方法、实例变量等结构性指标。
         Map<String, Object> lkMetrics = new LinkedHashMap<>();
         lkMetrics.put("NOA", aggregate.noa);
         lkMetrics.put("NPM", aggregate.npm);
@@ -106,6 +138,7 @@ public class MetricsAnalysisService {
         lkMetrics.put("ClassCount", aggregate.classCount);
         lkMetrics.put("MethodCount", aggregate.methodCount);
 
+        // traditionalMetrics：传统规模和复杂度指标。
         Map<String, Object> traditionalMetrics = new LinkedHashMap<>();
         traditionalMetrics.put("CyclomaticComplexity", aggregate.complexity);
         traditionalMetrics.put("AverageComplexity", round(aggregate.methodCount == 0 ? 0 : (double) aggregate.complexity / aggregate.methodCount));
@@ -114,6 +147,7 @@ public class MetricsAnalysisService {
         traditionalMetrics.put("CommentLines", aggregate.commentLines);
         traditionalMetrics.put("MaintainabilityLevel", resolveMaintainability(aggregate, loc));
 
+        // designMetrics：把设计阶段输入转成更适合展示和解释的结果。
         Map<String, Object> designMetrics = new LinkedHashMap<>();
         designMetrics.put("Actors", design.getActors());
         designMetrics.put("UseCases", design.getUseCases());
@@ -125,6 +159,7 @@ public class MetricsAnalysisService {
         designMetrics.put("UseCasePoints", round(useCaseWeight + design.getEntities() * 0.6));
         designMetrics.put("DecisionAlignment", resolveDecisionAlignment(design.getDecisions(), aggregate.complexity));
 
+        // estimation：给前端 KPI 卡片直接使用的人话结果。
         Map<String, Object> estimation = new LinkedHashMap<>();
         estimation.put("Effort", round(effort) + " 人月");
         estimation.put("Time", round(schedule) + " 月");
@@ -132,10 +167,13 @@ public class MetricsAnalysisService {
         estimation.put("People", recommendedPeople + " 人");
         estimation.put("ConfiguredPeople", configuredPeople + " 人");
 
+        // uploadSummary：记录本次实际参与分析的文件列表。
         Map<String, Object> uploadSummary = new LinkedHashMap<>();
         uploadSummary.put("fileCount", analyzedFiles.size());
         uploadSummary.put("files", analyzedFiles);
 
+        // result：最终返回前端的总对象。
+        // 前端页面的大多数展示都直接从这里取值。
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("overview", overview);
         result.put("ckMetrics", ckMetrics);
@@ -147,6 +185,7 @@ public class MetricsAnalysisService {
         result.put("riskSignals", buildRiskSignals(aggregate, loc, design));
         result.put("uploadSummary", uploadSummary);
 
+        // 同时保留一部分扁平字段，兼容旧版前端的绑定方式。
         result.put("LoC", loc);
         result.put("WMC", aggregate.wmc);
         result.put("DIT", aggregate.dit);
@@ -164,8 +203,20 @@ public class MetricsAnalysisService {
         result.put("People", estimation.get("People"));
         return result;
     }
+    /**
+     * 解析Java源代码为AST（抽象语法树）
 
+     * AST (Abstract Syntax Tree)：源代码的结构化表示
+     * 例如：if语句会变成一个IfStatement节点，包含condition、thenStatement、elseStatement等子节点
+
+     * 使用Eclipse JDT（Java Development Tools）的ASTParser
+     *
+     * @param code Java源代码字符串
+     * @return MetricsVisitor对象（包含了遍历AST后收集的所有度量数据）
+     */
     private MetricsVisitor parseSource(String code) {
+        // 使用 Eclipse JDT 的 ASTParser 把源码转成抽象语法树（AST）。
+        // 这样统计是基于语法结构，而不是脆弱的字符串匹配。
         ASTParser parser = ASTParser.newParser(AST.JLS16);
         parser.setSource(code.toCharArray());
         parser.setKind(ASTParser.K_COMPILATION_UNIT);
@@ -223,7 +274,9 @@ public class MetricsAnalysisService {
         }
         return "需优化";
     }
-
+    /**
+     * 评估设计与代码的一致性
+     */
     private String resolveDecisionAlignment(int designedDecisions, int complexity) {
         if (designedDecisions <= 0) {
             return "未提供设计阶段判定数";
@@ -247,7 +300,11 @@ public class MetricsAnalysisService {
     }
 
     private record SourceUnit(String name, String content) {}
+    /**
+     * 聚合汇总类
 
+     * 把多个文件的分析结果累加起来，形成项目的整体度量值
+     */
     private static class AggregateSummary {
         private int loc;
         private int blankLines;
@@ -269,6 +326,8 @@ public class MetricsAnalysisService {
         private final List<Map<String, Object>> classBreakdown = new ArrayList<>();
 
         private void accumulate(MetricsVisitor.AnalysisSummary summary, String sourceName) {
+            // 文件级指标在这里累加成项目级结果；
+            // classBreakdown 则保留逐类明细，供前端“类级明细”直接展示。
             loc += summary.loc();
             blankLines += summary.blankLines();
             commentLines += summary.commentLines();
