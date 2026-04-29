@@ -4,13 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c10fc82b-d516-4b95-a300-d96d9a73f1ab" name="更改" comment="基本架构">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/example/metrics/controller/MetricsController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/example/metrics/controller/MetricsController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/example/metrics/dto/EstimateInput.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/example/metrics/dto/EstimateInput.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/example/metrics/service/MetricsAnalysisService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/example/metrics/service/MetricsAnalysisService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/example/metrics/util/MetricsVisitor.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/example/metrics/util/MetricsVisitor.java" afterDir="false" />
-    </list>
+    <list default="true" id="c10fc82b-d516-4b95-a300-d96d9a73f1ab" name="更改" comment="注释添加" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -91,7 +85,7 @@
       <workItem from="1777218483316" duration="4174000" />
       <workItem from="1777369337004" duration="770000" />
       <workItem from="1777385825394" duration="898000" />
-      <workItem from="1777439658253" duration="5817000" />
+      <workItem from="1777439658253" duration="6127000" />
     </task>
     <task id="LOCAL-00001" summary="基本架构">
       <option name="closed" value="true" />
@@ -101,7 +95,15 @@
       <option name="project" value="LOCAL" />
       <updated>1777197602315</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="注释添加">
+      <option name="closed" value="true" />
+      <created>1777449091568</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1777449091568</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -120,6 +122,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="基本架构" />
-    <option name="LAST_COMMIT_MESSAGE" value="基本架构" />
+    <MESSAGE value="注释添加" />
+    <option name="LAST_COMMIT_MESSAGE" value="注释添加" />
   </component>
 </project>
